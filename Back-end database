@@ -1,0 +1,37 @@
+import pymongo
+import gridfs
+import cv2
+
+# 连接MongoDB数据库
+client = pymongo.MongoClient("mongodb://localhost:27017/")
+db = client["face_recognition"]
+fs = gridfs.GridFS(db)
+
+# 加载人脸检测器
+face_detector = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+
+# 将人脸图像保存到数据库
+def save_face(image, name):
+    # 检测人脸
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    faces = face_detector.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=5, minSize=(30, 30))
+
+    # 取第一张检测到的人脸图像
+    for (x, y, w, h) in faces:
+        face_img = image[y:y+h, x:x+w]
+
+        # 将人脸图像保存到数据库
+        fs.put(face_img, filename=name)
+
+# 从数据库中读取人脸图像
+def load_face(name):
+    # 从数据库中获取人脸图像
+    data = fs.find_one({"filename": name})
+
+    if data is not None:
+        # 将数据转换为OpenCV图像格式并返回
+        img_array = bytearray(data.read())
+        img_np = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        return img_np
+
+    return None
