@@ -1,0 +1,59 @@
+import cv2
+import dlib
+import numpy as np
+import tensorflow as tf
+
+# 加载人脸检测器和人脸关键点检测器
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+
+# 加载人脸识别模型
+model = tf.keras.models.load_model("face_recognition_model.h5")
+
+# 读取待识别的图片和视频
+img = cv2.imread("test.jpg")
+cap = cv2.VideoCapture("test.mp4")
+
+# 处理图片
+img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+faces = detector(img_gray)
+for face in faces:
+    landmarks = predictor(img_gray, face)
+    face_array = np.array([(landmarks.part(n).x, landmarks.part(n).y) for n in range(68)])
+    face_image = img[face.top():face.bottom(), face.left():face.right()]
+    face_image = cv2.resize(face_image, (160, 160))
+    face_image = face_image / 255.0
+    face_image = np.expand_dims(face_image, axis=0)
+    face_embedding = model.predict(face_image)
+
+    # 在图片中标出人脸并显示识别结果
+    cv2.rectangle(img, (face.left(), face.top()), (face.right(), face.bottom()), (0, 255, 0), 2)
+    cv2.putText(img, "Person " + str(np.argmax(face_embedding)), (face.left(), face.top() - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+# 处理视频
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = detector(frame_gray)
+    for face in faces:
+        landmarks = predictor(frame_gray, face)
+        face_array = np.array([(landmarks.part(n).x, landmarks.part(n).y) for n in range(68)])
+        face_image = frame[face.top():face.bottom(), face.left():face.right()]
+        face_image = cv2.resize(face_image, (160, 160))
+        face_image = face_image / 255.0
+        face_image = np.expand_dims(face_image, axis=0)
+        face_embedding = model.predict(face_image)
+
+        # 在视频中标出人脸并显示识别结果
+        cv2.rectangle(frame, (face.left(), face.top()), (face.right(), face.bottom()), (0, 255, 0), 2)
+        cv2.putText(frame, "Person " + str(np.argmax(face_embedding)), (face.left(), face.top() - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+    cv2.imshow("Face Recognition", frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
